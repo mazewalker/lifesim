@@ -22,7 +22,8 @@ The Life Cell Simulator is a Python implementation of Conway's Game of Life, sup
   - `R`: Reset grid with random live cells
   - `C`: Clear the grid (all cells dead)
   - `UP/DOWN ARROWS`: Adjust simulation speed
-  - Close the window or press `ESC` to exit
+  - `ESC` or `Ctrl+C`: Exit the simulation
+  - Close window button: Exit the simulation
 
 ### Text-Only Mode (CLI)
 - Renders the grid using ASCII characters:
@@ -31,9 +32,13 @@ The Life Cell Simulator is a Python implementation of Conway's Game of Life, sup
 - Dynamically updates the grid in the terminal
 - Interactive controls:
   - `SPACE`: Pause/unpause simulation
-  - `ENTER`: Add a new live cell at a random location
-  - `Ctrl+C`: Exit the simulation
-- Status display showing current simulation state
+  - `R`: Reset grid with random live cells
+  - `C`: Clear the grid (all cells dead)
+  - `UP/DOWN ARROWS`: Adjust simulation speed
+  - `ESC` or `Ctrl+C`: Exit the simulation
+- Status display showing:
+  - Current simulation state (Running/Paused)
+  - Update speed (updates per second)
 
 ---
 
@@ -67,14 +72,14 @@ The program implements automatic mode selection. When no specific mode is indica
 
 ## Command-Line Arguments
 
-| Argument | Default | Description |
-|----------|---------|-------------|
-| `--rows` | 20 | Number of rows in the grid |
-| `--cols` | 30 | Number of columns in the grid |
-| `--cell_size` | 20 | Size of each cell in pixels (GUI mode only) |
-| `--speed` | 0.5 | Update interval in seconds (CLI mode only) |
-| `--gui` | None | Force graphical mode |
-| `--text` | None | Force text-only mode |
+| Argument      | Default | Description                                 |
+| ------------- | ------- | ------------------------------------------- |
+| `--rows`      | 20      | Number of rows in the grid                  |
+| `--cols`      | 30      | Number of columns in the grid               |
+| `--cell_size` | 20      | Size of each cell in pixels (GUI mode only) |
+| `--speed`     | 0.5     | Update interval in seconds (CLI mode only)  |
+| `--gui`       | None    | Force graphical mode                        |
+| `--text`      | None    | Force text-only mode                        |
 
 ## Example Commands
 
