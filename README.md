@@ -21,9 +21,10 @@ The Life Cell Simulator is a Python implementation of Conway's Game of Life, sup
   - `SPACE`: Pause/unpause simulation
   - `R`: Reset grid with random live cells
   - `C`: Clear the grid (all cells dead)
-  - `UP/DOWN ARROWS`: Adjust simulation speed
+  - `UP/DOWN ARROWS` or `+/-`: Adjust simulation speed
   - `ESC` or `Ctrl+C`: Exit the simulation
   - Close window button: Exit the simulation
+- Status display showing current simulation speed (FPS)
 
 ### Text-Only Mode (CLI)
 - Renders the grid using ASCII characters:
@@ -34,7 +35,7 @@ The Life Cell Simulator is a Python implementation of Conway's Game of Life, sup
   - `SPACE`: Pause/unpause simulation
   - `R`: Reset grid with random live cells
   - `C`: Clear the grid (all cells dead)
-  - `UP/DOWN ARROWS`: Adjust simulation speed
+  - `+/-`: Adjust simulation speed
   - `ESC` or `Ctrl+C`: Exit the simulation
 - Status display showing:
   - Current simulation state (Running/Paused)

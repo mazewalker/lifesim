@@ -43,12 +43,13 @@ def add_random_cell(grid):
 # CLI Text-Only Version
 def run_text_mode(rows, cols, speed):
     """Run the simulation in text-only mode with interactive controls."""
-    grid = create_grid(rows, cols, randomize=True)  # Always start with random grid
+    grid = create_grid(rows, cols, randomize=True)
     paused = False
     running = True
+    update_rate = 2  # Starting speed (updates per second)
 
     # Set up terminal for non-blocking input
-    if sys.platform != 'win32':
+    if sys.platform != "win32":
         old_settings = termios.tcgetattr(sys.stdin)
         try:
             tty.setcbreak(sys.stdin.fileno())
@@ -61,30 +62,30 @@ def run_text_mode(rows, cols, speed):
                 print("Space: Pause/Resume")
                 print("R: Reset grid with random cells")
                 print("C: Clear grid")
-                print("Up/Down: Adjust speed")
+                print("+/-: Adjust speed")
                 print("ESC or Ctrl+C: Exit")
                 print(f"\nStatus: {'Paused' if paused else 'Running'}")
-                print(f"Speed: {1/speed:.1f} updates/second")
+                print(f"Speed: {update_rate} updates/second")
 
                 # Check for key press
                 key = is_key_pressed()
                 if key:
-                    if key == ' ':
+                    if key == " ":
                         paused = not paused
-                    elif key.lower() == 'r':
+                    elif key.lower() == "r":
                         grid = create_grid(rows, cols, randomize=True)
-                    elif key.lower() == 'c':
+                    elif key.lower() == "c":
                         grid = create_grid(rows, cols, randomize=False)
-                    elif key == '\x1b':  # ESC key
+                    elif key == "\x1b":  # ESC key
                         running = False
-                    elif key == '\x1b[A':  # Up arrow
-                        speed = max(0.1, speed - 0.1)
-                    elif key == '\x1b[B':  # Down arrow
-                        speed = min(2.0, speed + 0.1)
+                    elif key in ("+", "="):  # Plus key (= is unshifted +)
+                        update_rate = min(10, update_rate + 1)
+                    elif key == "-":  # Minus key
+                        update_rate = max(1, update_rate - 1)
 
                 if not paused:
                     grid = next_generation(grid)
-                time.sleep(speed)
+                time.sleep(1 / update_rate)  # Convert speed to delay
 
         except KeyboardInterrupt:
             print("\nSimulation ended.")
@@ -101,32 +102,33 @@ def run_text_mode(rows, cols, speed):
                 print("Space: Pause/Resume")
                 print("R: Reset grid with random cells")
                 print("C: Clear grid")
-                print("Up/Down: Adjust speed")
+                print("+/-: Adjust speed")
                 print("ESC or Ctrl+C: Exit")
                 print(f"\nStatus: {'Paused' if paused else 'Running'}")
-                print(f"Speed: {1/speed:.1f} updates/second")
+                print(f"Speed: {update_rate} updates/second")
 
                 key = is_key_pressed()
                 if key:
-                    if key == ' ':
+                    if key == " ":
                         paused = not paused
-                    elif key.lower() == 'r':
+                    elif key.lower() == "r":
                         grid = create_grid(rows, cols, randomize=True)
-                    elif key.lower() == 'c':
+                    elif key.lower() == "c":
                         grid = create_grid(rows, cols, randomize=False)
-                    elif key == '\x1b':  # ESC key
+                    elif key == "\x1b":  # ESC key
                         running = False
-                    elif key == '\x48':  # Up arrow in Windows
-                        speed = max(0.1, speed - 0.1)
-                    elif key == '\x50':  # Down arrow in Windows
-                        speed = min(2.0, speed + 0.1)
+                    elif key in ("+", "="):  # Plus key
+                        update_rate = min(10, update_rate + 1)
+                    elif key == "-":  # Minus key
+                        update_rate = max(1, update_rate - 1)
 
                 if not paused:
                     grid = next_generation(grid)
-                time.sleep(speed)
+                time.sleep(1 / update_rate)  # Convert speed to delay
 
         except KeyboardInterrupt:
             print("\nSimulation ended.")
+
 
 # Common Grid Functions
 def create_grid(rows, cols, randomize=False):
@@ -180,6 +182,7 @@ def run_gui_mode(rows, cols, cell_size, speed):
     clock = pygame.time.Clock()
 
     grid = create_grid(rows, cols, randomize=True)
+    fps = 10  # Starting speed (frames per second)
 
     running = True
     paused = False
@@ -198,15 +201,21 @@ def run_gui_mode(rows, cols, cell_size, speed):
                         grid = create_grid(rows, cols, randomize=True)
                     elif event.key == pygame.K_c:
                         grid = create_grid(rows, cols)
-                    elif event.key == pygame.K_UP:
-                        speed = max(1, speed - 1)
-                    elif event.key == pygame.K_DOWN:
-                        speed += 1
+                    elif event.key in (pygame.K_UP, pygame.K_PLUS, pygame.K_KP_PLUS):
+                        fps = min(60, fps + 5)  # Increase speed
+                    elif event.key in (
+                        pygame.K_DOWN,
+                        pygame.K_MINUS,
+                        pygame.K_KP_MINUS,
+                    ):
+                        fps = max(1, fps - 5)  # Decrease speed
                     elif event.key == pygame.K_ESCAPE:
                         running = False
 
             # Handle Ctrl+C
-            if pygame.key.get_pressed()[pygame.K_c] and (pygame.key.get_mods() & pygame.KMOD_CTRL):
+            if pygame.key.get_pressed()[pygame.K_c] and (
+                pygame.key.get_mods() & pygame.KMOD_CTRL
+            ):
                 running = False
 
             if not paused:
@@ -216,11 +225,18 @@ def run_gui_mode(rows, cols, cell_size, speed):
                 for y in range(cols):
                     color = ALIVE_COLOR if grid[x][y] == 1 else DEAD_COLOR
                     pygame.draw.rect(
-                        screen, color, (y * cell_size, x * cell_size, cell_size, cell_size)
+                        screen,
+                        color,
+                        (y * cell_size, x * cell_size, cell_size, cell_size),
                     )
 
+            # Display current speed
+            font = pygame.font.Font(None, 24)
+            speed_text = font.render(f"Speed: {fps} FPS", True, BLACK)
+            screen.blit(speed_text, (10, 10))
+
             pygame.display.flip()
-            clock.tick(speed)
+            clock.tick(fps)
 
     except KeyboardInterrupt:
         pass
@@ -267,9 +283,7 @@ def main():
         except Exception as e:
             print(f"Failed to start graphical mode: {e}")
             print("Falling back to text-only mode.")
-            run_text_mode(
-                args.rows, args.cols, args.speed
-            )
+            run_text_mode(args.rows, args.cols, args.speed)
 
 
 if __name__ == "__main__":
