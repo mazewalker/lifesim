@@ -1,11 +1,20 @@
-import os
-import time
-import random
+"""
+Life Cell Simulator - A Python implementation of Conway's Game of Life.
+
+This module provides both graphical (Pygame) and text-based interfaces for simulating
+cellular automata based on Conway's Game of Life rules. It supports interactive controls,
+adjustable simulation speeds, and dynamic mode switching between GUI and CLI versions.
+"""
+
 import argparse
-import sys
+import os
+import random
 import select
+import sys
 import termios
+import time
 import tty
+from typing import List, Optional
 
 # Optional: Try to import Pygame. If unavailable, set a fallback flag.
 try:
@@ -15,237 +24,293 @@ try:
 except ImportError:
     PYGAME_AVAILABLE = False
 
+# Configuration constants
+SIMULATION_CONFIG = {
+    "min_speed": 1,
+    "max_speed": 60,
+    "speed_increment": 5,
+    "default_fps": 10,
+}
 
-def is_key_pressed():
-    """Check if a key was pressed without blocking."""
+COLORS = {
+    "white": (255, 255, 255),
+    "black": (0, 0, 0),
+    "alive": (50, 205, 50),  # Green for alive cells
+    "dead": (30, 30, 30),  # Dark gray for dead cells
+}
+
+
+def is_key_pressed() -> Optional[str]:
+    """Check if a key was pressed without blocking.
+
+    Returns:
+        Optional[str]: The pressed key character if available, None otherwise.
+    """
     if sys.platform != "win32":
         # Unix-like systems
         if select.select([sys.stdin], [], [], 0)[0]:
             return sys.stdin.read(1)
         return None
-    else:
-        # Windows systems
+
+    # Windows systems - import msvcrt only when needed
+    try:
         import msvcrt
 
-        if msvcrt.kbhit():
-            return msvcrt.getch().decode("utf-8")
+        return msvcrt.getch().decode("utf-8") if msvcrt.kbhit() else None
+    except ImportError:
         return None
 
 
-def add_random_cell(grid):
-    """Add a live cell at a random location."""
-    rows, cols = len(grid), len(grid[0])
-    x, y = random.randint(0, rows - 1), random.randint(0, cols - 1)
-    grid[x][y] = 1
-    return grid
+class LifeSimulator:
+    """Manages the core logic for Conway's Game of Life simulation."""
+
+    def __init__(self, rows: int, cols: int):
+        """Initialize the simulator with given dimensions.
+
+        Args:
+            rows (int): Number of rows in the grid
+            cols (int): Number of columns in the grid
+        """
+        self.rows = rows
+        self.cols = cols
+        self.grid = self.create_grid(randomize=True)
+
+    def create_grid(self, randomize: bool = False) -> List[List[int]]:
+        """Initialize the grid with dead cells or random live cells.
+
+        Args:
+            randomize (bool): If True, randomly populate the grid with live cells
+
+        Returns:
+            List[List[int]]: The initialized grid
+        """
+        if randomize:
+            return [
+                [random.choice([0, 1]) for _ in range(self.cols)]
+                for _ in range(self.rows)
+            ]
+        return [[0 for _ in range(self.cols)] for _ in range(self.rows)]
+
+    def count_neighbors(self, x: int, y: int) -> int:
+        """Count the live neighbors around a cell.
+
+        Args:
+            x (int): Row index of the cell
+            y (int): Column index of the cell
+
+        Returns:
+            int: Number of live neighbors
+        """
+        directions = [
+            (-1, -1),
+            (-1, 0),
+            (-1, 1),
+            (0, -1),
+            (0, 1),
+            (1, -1),
+            (1, 0),
+            (1, 1),
+        ]
+        count = 0
+        for dx, dy in directions:
+            nx, ny = x + dx, y + dy
+            if 0 <= nx < self.rows and 0 <= ny < self.cols:
+                count += self.grid[nx][ny]
+        return count
+
+    def next_generation(self) -> None:
+        """Compute the next state of the grid based on Conway's rules."""
+        new_grid = [[0 for _ in range(self.cols)] for _ in range(self.rows)]
+        for x in range(self.rows):
+            for y in range(self.cols):
+                neighbors = self.count_neighbors(x, y)
+                if self.grid[x][y] == 1:
+                    # Survival: 2 or 3 neighbors
+                    new_grid[x][y] = 1 if neighbors in (2, 3) else 0
+                else:
+                    # Birth: exactly 3 neighbors
+                    new_grid[x][y] = 1 if neighbors == 3 else 0
+        self.grid = new_grid
 
 
-# CLI Text-Only Version
-def run_text_mode(rows, cols, speed):
-    """Run the simulation in text-only mode with interactive controls."""
-    grid = create_grid(rows, cols, randomize=True)
-    paused = False
-    running = True
-    update_rate = 2  # Starting speed (updates per second)
+class TextInterface:
+    """Handles the text-based interface for the Life simulator."""
 
-    # Set up terminal for non-blocking input
-    if sys.platform != "win32":
-        old_settings = termios.tcgetattr(sys.stdin)
+    def __init__(self, simulator: LifeSimulator):
+        """Initialize the text interface.
+
+        Args:
+            simulator (LifeSimulator): The life simulation instance
+        """
+        self.simulator = simulator
+        self.update_rate = SIMULATION_CONFIG["default_fps"]
+        self.running = True
+        self.paused = False
+
+    def display_grid(self) -> None:
+        """Display the current grid state in text mode."""
+        os.system("cls" if os.name == "nt" else "clear")
+        for row in self.simulator.grid:
+            print("".join("#" if cell else "." for cell in row))
+        self.display_controls()
+
+    def display_controls(self) -> None:
+        """Display the control information."""
+        print("\nControls:")
+        print("Space: Pause/Resume")
+        print("R: Reset grid with random cells")
+        print("C: Clear grid")
+        print("+/-: Adjust speed")
+        print("ESC or Ctrl+C: Exit")
+        print(f"\nStatus: {'Paused' if self.paused else 'Running'}")
+        print(f"Speed: {self.update_rate} updates/second")
+
+    def handle_input(self) -> None:
+        """Handle user input for the text interface."""
+        key = is_key_pressed()
+        if not key:
+            return
+
+        if key == " ":
+            self.paused = not self.paused
+        elif key.lower() == "r":
+            self.simulator.grid = self.simulator.create_grid(randomize=True)
+        elif key.lower() == "c":
+            self.simulator.grid = self.simulator.create_grid(randomize=False)
+        elif key == "\x1b":  # ESC key
+            self.running = False
+        elif key in ("+", "="):
+            self.update_rate = min(SIMULATION_CONFIG["max_speed"], self.update_rate + 1)
+        elif key == "-":
+            self.update_rate = max(SIMULATION_CONFIG["min_speed"], self.update_rate - 1)
+
+    def run(self) -> None:
+        """Run the text-based simulation loop."""
+        if sys.platform != "win32":
+            old_settings = termios.tcgetattr(sys.stdin)
+            try:
+                tty.setcbreak(sys.stdin.fileno())
+                self._run_simulation_loop()
+            finally:
+                termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
+        else:
+            self._run_simulation_loop()
+
+    def _run_simulation_loop(self) -> None:
+        """Internal simulation loop implementation."""
         try:
-            tty.setcbreak(sys.stdin.fileno())
-
-            while running:
-                os.system("cls" if os.name == "nt" else "clear")
-                for row in grid:
-                    print("".join("#" if cell else "." for cell in row))
-                print("\nControls:")
-                print("Space: Pause/Resume")
-                print("R: Reset grid with random cells")
-                print("C: Clear grid")
-                print("+/-: Adjust speed")
-                print("ESC or Ctrl+C: Exit")
-                print(f"\nStatus: {'Paused' if paused else 'Running'}")
-                print(f"Speed: {update_rate} updates/second")
-
-                # Check for key press
-                key = is_key_pressed()
-                if key:
-                    if key == " ":
-                        paused = not paused
-                    elif key.lower() == "r":
-                        grid = create_grid(rows, cols, randomize=True)
-                    elif key.lower() == "c":
-                        grid = create_grid(rows, cols, randomize=False)
-                    elif key == "\x1b":  # ESC key
-                        running = False
-                    elif key in ("+", "="):  # Plus key (= is unshifted +)
-                        update_rate = min(10, update_rate + 1)
-                    elif key == "-":  # Minus key
-                        update_rate = max(1, update_rate - 1)
-
-                if not paused:
-                    grid = next_generation(grid)
-                time.sleep(1 / update_rate)  # Convert speed to delay
-
+            while self.running:
+                self.display_grid()
+                self.handle_input()
+                if not self.paused:
+                    self.simulator.next_generation()
+                time.sleep(1 / self.update_rate)
         except KeyboardInterrupt:
             print("\nSimulation ended.")
+
+
+class GUIInterface:
+    """Handles the graphical interface for the Life simulator."""
+
+    def __init__(self, simulator: LifeSimulator, cell_size: int):
+        """Initialize the GUI interface.
+
+        Args:
+            simulator (LifeSimulator): The life simulation instance
+            cell_size (int): Size of each cell in pixels
+        """
+        self.simulator = simulator
+        self.cell_size = cell_size
+        self.width = simulator.cols * cell_size
+        self.height = simulator.rows * cell_size
+        self.fps = SIMULATION_CONFIG["default_fps"]
+        self.running = True
+        self.paused = False
+
+        pygame.init()
+        self.screen = pygame.display.set_mode((self.width, self.height))
+        pygame.display.set_caption("Conway's Game of Life")
+        self.clock = pygame.time.Clock()
+        self.font = pygame.font.Font(None, 24)
+
+    def handle_events(self) -> None:
+        """Handle pygame events."""
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                self.running = False
+            elif event.type == pygame.KEYDOWN:
+                self._handle_keydown(event.key)
+
+    def _handle_keydown(self, key: int) -> None:
+        """Handle keyboard input events.
+
+        Args:
+            key (int): The pygame key constant
+        """
+        if key == pygame.K_SPACE:
+            self.paused = not self.paused
+        elif key == pygame.K_r:
+            self.simulator.grid = self.simulator.create_grid(randomize=True)
+        elif key == pygame.K_c:
+            self.simulator.grid = self.simulator.create_grid(randomize=False)
+        elif key in (pygame.K_UP, pygame.K_PLUS, pygame.K_KP_PLUS):
+            self.fps = min(
+                SIMULATION_CONFIG["max_speed"],
+                self.fps + SIMULATION_CONFIG["speed_increment"],
+            )
+        elif key in (pygame.K_DOWN, pygame.K_MINUS, pygame.K_KP_MINUS):
+            self.fps = max(
+                SIMULATION_CONFIG["min_speed"],
+                self.fps - SIMULATION_CONFIG["speed_increment"],
+            )
+        elif key == pygame.K_ESCAPE:
+            self.running = False
+
+    def draw(self) -> None:
+        """Draw the current state of the grid."""
+        self.screen.fill(COLORS["white"])
+
+        for x in range(self.simulator.rows):
+            for y in range(self.simulator.cols):
+                color = COLORS["alive"] if self.simulator.grid[x][y] else COLORS["dead"]
+                pygame.draw.rect(
+                    self.screen,
+                    color,
+                    (
+                        y * self.cell_size,
+                        x * self.cell_size,
+                        self.cell_size,
+                        self.cell_size,
+                    ),
+                )
+
+        # Display current speed
+        speed_text = self.font.render(f"Speed: {self.fps} FPS", True, COLORS["black"])
+        self.screen.blit(speed_text, (10, 10))
+
+        pygame.display.flip()
+
+    def run(self) -> None:
+        """Run the GUI simulation loop."""
+        try:
+            while self.running:
+                self.handle_events()
+                if not self.paused:
+                    self.simulator.next_generation()
+                self.draw()
+                self.clock.tick(self.fps)
+        except KeyboardInterrupt:
+            pass
         finally:
-            termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
-    else:
-        # Windows version
-        try:
-            while running:
-                os.system("cls")
-                for row in grid:
-                    print("".join("#" if cell else "." for cell in row))
-                print("\nControls:")
-                print("Space: Pause/Resume")
-                print("R: Reset grid with random cells")
-                print("C: Clear grid")
-                print("+/-: Adjust speed")
-                print("ESC or Ctrl+C: Exit")
-                print(f"\nStatus: {'Paused' if paused else 'Running'}")
-                print(f"Speed: {update_rate} updates/second")
-
-                key = is_key_pressed()
-                if key:
-                    if key == " ":
-                        paused = not paused
-                    elif key.lower() == "r":
-                        grid = create_grid(rows, cols, randomize=True)
-                    elif key.lower() == "c":
-                        grid = create_grid(rows, cols, randomize=False)
-                    elif key == "\x1b":  # ESC key
-                        running = False
-                    elif key in ("+", "="):  # Plus key
-                        update_rate = min(10, update_rate + 1)
-                    elif key == "-":  # Minus key
-                        update_rate = max(1, update_rate - 1)
-
-                if not paused:
-                    grid = next_generation(grid)
-                time.sleep(1 / update_rate)  # Convert speed to delay
-
-        except KeyboardInterrupt:
-            print("\nSimulation ended.")
+            pygame.quit()
 
 
-# Common Grid Functions
-def create_grid(rows, cols, randomize=False):
-    """Initialize the grid with dead cells or random live cells."""
-    if randomize:
-        return [[random.choice([0, 1]) for _ in range(cols)] for _ in range(rows)]
-    return [[0 for _ in range(cols)] for _ in range(rows)]
+def parse_arguments() -> argparse.Namespace:
+    """Parse command line arguments.
 
-
-def count_neighbors(grid, x, y):
-    """Count the live neighbors around a cell."""
-    rows, cols = len(grid), len(grid[0])
-    directions = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
-    count = 0
-    for dx, dy in directions:
-        nx, ny = x + dx, y + dy
-        if 0 <= nx < rows and 0 <= ny < cols:
-            count += grid[nx][ny]
-    return count
-
-
-def next_generation(grid):
-    """Compute the next state of the grid based on Conway's rules."""
-    rows, cols = len(grid), len(grid[0])
-    new_grid = [[0 for _ in range(cols)] for _ in range(rows)]
-    for x in range(rows):
-        for y in range(cols):
-            neighbors = count_neighbors(grid, x, y)
-            if grid[x][y] == 1:
-                # Survival: 2 or 3 neighbors
-                new_grid[x][y] = 1 if neighbors in (2, 3) else 0
-            else:
-                # Birth: exactly 3 neighbors
-                new_grid[x][y] = 1 if neighbors == 3 else 0
-    return new_grid
-
-
-# Pygame GUI Version
-def run_gui_mode(rows, cols, cell_size, speed):
-    """Run the simulation with Pygame graphical interface."""
-    WHITE = (255, 255, 255)
-    BLACK = (0, 0, 0)
-    ALIVE_COLOR = (50, 205, 50)  # Green for alive cells
-    DEAD_COLOR = (30, 30, 30)  # Dark gray for dead cells
-
-    width, height = cols * cell_size, rows * cell_size
-
-    pygame.init()
-    screen = pygame.display.set_mode((width, height))
-    pygame.display.set_caption("Conway's Game of Life")
-    clock = pygame.time.Clock()
-
-    grid = create_grid(rows, cols, randomize=True)
-    fps = 10  # Starting speed (frames per second)
-
-    running = True
-    paused = False
-
-    try:
-        while running:
-            screen.fill(WHITE)
-
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    running = False
-                elif event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_SPACE:
-                        paused = not paused
-                    elif event.key == pygame.K_r:
-                        grid = create_grid(rows, cols, randomize=True)
-                    elif event.key == pygame.K_c:
-                        grid = create_grid(rows, cols)
-                    elif event.key in (pygame.K_UP, pygame.K_PLUS, pygame.K_KP_PLUS):
-                        fps = min(60, fps + 5)  # Increase speed
-                    elif event.key in (
-                        pygame.K_DOWN,
-                        pygame.K_MINUS,
-                        pygame.K_KP_MINUS,
-                    ):
-                        fps = max(1, fps - 5)  # Decrease speed
-                    elif event.key == pygame.K_ESCAPE:
-                        running = False
-
-            # Handle Ctrl+C
-            if pygame.key.get_pressed()[pygame.K_c] and (
-                pygame.key.get_mods() & pygame.KMOD_CTRL
-            ):
-                running = False
-
-            if not paused:
-                grid = next_generation(grid)
-
-            for x in range(rows):
-                for y in range(cols):
-                    color = ALIVE_COLOR if grid[x][y] == 1 else DEAD_COLOR
-                    pygame.draw.rect(
-                        screen,
-                        color,
-                        (y * cell_size, x * cell_size, cell_size, cell_size),
-                    )
-
-            # Display current speed
-            font = pygame.font.Font(None, 24)
-            speed_text = font.render(f"Speed: {fps} FPS", True, BLACK)
-            screen.blit(speed_text, (10, 10))
-
-            pygame.display.flip()
-            clock.tick(fps)
-
-    except KeyboardInterrupt:
-        pass
-    finally:
-        pygame.quit()
-
-
-# Main Function to Choose Mode
-def main():
+    Returns:
+        argparse.Namespace: Parsed command line arguments
+    """
     parser = argparse.ArgumentParser(description="Life Cell Simulator")
     parser.add_argument(
         "--rows", type=int, default=20, help="Number of rows in the grid"
@@ -259,31 +324,33 @@ def main():
         default=20,
         help="Size of each cell in pixels (GUI only)",
     )
-    parser.add_argument(
-        "--speed",
-        type=float,
-        default=0.05,
-        help="Time (in seconds) between updates (CLI only)",
-    )
     parser.add_argument("--gui", action="store_true", help="Force graphical mode (GUI)")
     parser.add_argument(
         "--text", action="store_true", help="Force text-only mode (CLI)"
     )
-    args = parser.parse_args()
+    return parser.parse_args()
+
+
+def main() -> None:
+    """Main entry point for the Life Cell Simulator."""
+    args = parse_arguments()
+    simulator = LifeSimulator(args.rows, args.cols)
 
     if args.text or not PYGAME_AVAILABLE:
         if not PYGAME_AVAILABLE and args.gui:
             print("Pygame not available. Falling back to text-only mode.")
         print("Running in text-only mode.")
-        run_text_mode(args.rows, args.cols, args.speed)  # Remove randomize parameter
+        interface = TextInterface(simulator)
     else:
         try:
             print("Running in graphical mode.")
-            run_gui_mode(args.rows, args.cols, args.cell_size, 10)
-        except Exception as e:
-            print(f"Failed to start graphical mode: {e}")
+            interface = GUIInterface(simulator, args.cell_size)
+        except Exception as exc:
+            print(f"Failed to start graphical mode: {exc}")
             print("Falling back to text-only mode.")
-            run_text_mode(args.rows, args.cols, args.speed)
+            interface = TextInterface(simulator)
+
+    interface.run()
 
 
 if __name__ == "__main__":
