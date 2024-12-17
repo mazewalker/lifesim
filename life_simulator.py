@@ -16,6 +16,15 @@ import time
 import tty
 from typing import List, Optional
 
+# Optional: Try to import msvcrt on Windows
+if sys.platform == "win32":
+    try:
+        import msvcrt
+    except ImportError:
+        msvcrt = None
+else:
+    msvcrt = None
+
 # Optional: Try to import Pygame. If unavailable, set a fallback flag.
 try:
     import pygame
@@ -52,13 +61,10 @@ def is_key_pressed() -> Optional[str]:
             return sys.stdin.read(1)
         return None
 
-    # Windows systems - import msvcrt only when needed
-    try:
-        import msvcrt
-
+    # Windows systems
+    if msvcrt:
         return msvcrt.getch().decode("utf-8") if msvcrt.kbhit() else None
-    except ImportError:
-        return None
+    return None
 
 
 class LifeSimulator:
@@ -209,6 +215,20 @@ class TextInterface:
             print("\nSimulation ended.")
 
 
+class GUISettings:
+    """Stores GUI-specific settings and configuration."""
+
+    def __init__(self, cell_size: int):
+        """Initialize GUI settings.
+
+        Args:
+            cell_size (int): Size of each cell in pixels
+        """
+        self.cell_size = cell_size
+        self.fps = SIMULATION_CONFIG["default_fps"]
+        self.paused = False
+
+
 class GUIInterface:
     """Handles the graphical interface for the Life simulator."""
 
@@ -220,12 +240,10 @@ class GUIInterface:
             cell_size (int): Size of each cell in pixels
         """
         self.simulator = simulator
-        self.cell_size = cell_size
+        self.settings = GUISettings(cell_size)
         self.width = simulator.cols * cell_size
         self.height = simulator.rows * cell_size
-        self.fps = SIMULATION_CONFIG["default_fps"]
         self.running = True
-        self.paused = False
 
         pygame.init()
         self.screen = pygame.display.set_mode((self.width, self.height))
@@ -248,20 +266,20 @@ class GUIInterface:
             key (int): The pygame key constant
         """
         if key == pygame.K_SPACE:
-            self.paused = not self.paused
+            self.settings.paused = not self.settings.paused
         elif key == pygame.K_r:
             self.simulator.grid = self.simulator.create_grid(randomize=True)
         elif key == pygame.K_c:
             self.simulator.grid = self.simulator.create_grid(randomize=False)
         elif key in (pygame.K_UP, pygame.K_PLUS, pygame.K_KP_PLUS):
-            self.fps = min(
+            self.settings.fps = min(
                 SIMULATION_CONFIG["max_speed"],
-                self.fps + SIMULATION_CONFIG["speed_increment"],
+                self.settings.fps + SIMULATION_CONFIG["speed_increment"],
             )
         elif key in (pygame.K_DOWN, pygame.K_MINUS, pygame.K_KP_MINUS):
-            self.fps = max(
+            self.settings.fps = max(
                 SIMULATION_CONFIG["min_speed"],
-                self.fps - SIMULATION_CONFIG["speed_increment"],
+                self.settings.fps - SIMULATION_CONFIG["speed_increment"],
             )
         elif key == pygame.K_ESCAPE:
             self.running = False
@@ -277,15 +295,17 @@ class GUIInterface:
                     self.screen,
                     color,
                     (
-                        y * self.cell_size,
-                        x * self.cell_size,
-                        self.cell_size,
-                        self.cell_size,
+                        y * self.settings.cell_size,
+                        x * self.settings.cell_size,
+                        self.settings.cell_size,
+                        self.settings.cell_size,
                     ),
                 )
 
         # Display current speed
-        speed_text = self.font.render(f"Speed: {self.fps} FPS", True, COLORS["black"])
+        speed_text = self.font.render(
+            f"Speed: {self.settings.fps} FPS", True, COLORS["black"]
+        )
         self.screen.blit(speed_text, (10, 10))
 
         pygame.display.flip()
@@ -295,12 +315,10 @@ class GUIInterface:
         try:
             while self.running:
                 self.handle_events()
-                if not self.paused:
+                if not self.settings.paused:
                     self.simulator.next_generation()
                 self.draw()
-                self.clock.tick(self.fps)
-        except KeyboardInterrupt:
-            pass
+                self.clock.tick(self.settings.fps)
         finally:
             pygame.quit()
 
@@ -345,7 +363,7 @@ def main() -> None:
         try:
             print("Running in graphical mode.")
             interface = GUIInterface(simulator, args.cell_size)
-        except Exception as exc:
+        except pygame.error as exc:
             print(f"Failed to start graphical mode: {exc}")
             print("Falling back to text-only mode.")
             interface = TextInterface(simulator)
