@@ -17,13 +17,12 @@ import tty
 from typing import List, Optional
 
 # Optional: Try to import msvcrt on Windows
+MSVCRT = None
 if sys.platform == "win32":
     try:
-        import msvcrt
+        import msvcrt as MSVCRT
     except ImportError:
-        msvcrt = None
-else:
-    msvcrt = None
+        pass
 
 # Optional: Try to import Pygame. If unavailable, set a fallback flag.
 try:
