@@ -16,6 +16,16 @@ import time
 import tty
 from typing import List, Optional
 
+# Platform-specific imports
+MSVCRT_AVAILABLE = False
+if sys.platform == "win32":
+    try:
+        import msvcrt
+
+        MSVCRT_AVAILABLE = True
+    except ImportError:
+        pass
+
 # Optional: Try to import Pygame. If unavailable, set a fallback flag.
 try:
     import pygame
@@ -53,13 +63,8 @@ def is_key_pressed() -> Optional[str]:
         return None
 
     # Windows systems
-    if sys.platform == "win32":
-        try:
-            import msvcrt
-
-            return msvcrt.getch().decode("utf-8") if msvcrt.kbhit() else None
-        except ImportError:
-            return None
+    if MSVCRT_AVAILABLE:
+        return msvcrt.getch().decode("utf-8") if msvcrt.kbhit() else None
     return None
 
 
