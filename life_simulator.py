@@ -2,6 +2,10 @@ import os
 import time
 import random
 import argparse
+import sys
+import select
+import termios
+import tty
 
 # Optional: Try to import Pygame. If unavailable, set a fallback flag.
 try:
@@ -10,6 +14,94 @@ try:
     PYGAME_AVAILABLE = True
 except ImportError:
     PYGAME_AVAILABLE = False
+
+
+def is_key_pressed():
+    """Check if a key was pressed without blocking."""
+    if sys.platform != "win32":
+        # Unix-like systems
+        if select.select([sys.stdin], [], [], 0)[0]:
+            return sys.stdin.read(1)
+        return None
+    else:
+        # Windows systems
+        import msvcrt
+
+        if msvcrt.kbhit():
+            return msvcrt.getch().decode("utf-8")
+        return None
+
+
+def add_random_cell(grid):
+    """Add a live cell at a random location."""
+    rows, cols = len(grid), len(grid[0])
+    x, y = random.randint(0, rows - 1), random.randint(0, cols - 1)
+    grid[x][y] = 1
+    return grid
+
+
+# CLI Text-Only Version
+def run_text_mode(rows, cols, speed):
+    """Run the simulation in text-only mode with interactive controls."""
+    grid = create_grid(rows, cols, randomize=True)  # Always start with random grid
+    paused = False
+
+    # Set up terminal for non-blocking input
+    if sys.platform != "win32":
+        old_settings = termios.tcgetattr(sys.stdin)
+        try:
+            tty.setcbreak(sys.stdin.fileno())
+
+            while True:
+                os.system("cls" if os.name == "nt" else "clear")
+                for row in grid:
+                    print("".join("#" if cell else "." for cell in row))
+                print("\nControls:")
+                print("Space: Pause/Resume")
+                print("Enter: Add random cell")
+                print("Ctrl+C: Exit")
+                print(f"Status: {'Paused' if paused else 'Running'}")
+
+                # Check for key press
+                key = is_key_pressed()
+                if key == " ":
+                    paused = not paused
+                elif key == "\n":
+                    grid = add_random_cell(grid)
+
+                if not paused:
+                    grid = next_generation(grid)
+                time.sleep(speed)
+
+        except KeyboardInterrupt:
+            print("\nSimulation ended.")
+        finally:
+            termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
+    else:
+        # Windows version
+        try:
+            while True:
+                os.system("cls")
+                for row in grid:
+                    print("".join("#" if cell else "." for cell in row))
+                print("\nControls:")
+                print("Space: Pause/Resume")
+                print("Enter: Add random cell")
+                print("Ctrl+C: Exit")
+                print(f"Status: {'Paused' if paused else 'Running'}")
+
+                key = is_key_pressed()
+                if key == " ":
+                    paused = not paused
+                elif key == "\r":  # Windows uses \r for Enter
+                    grid = add_random_cell(grid)
+
+                if not paused:
+                    grid = next_generation(grid)
+                time.sleep(speed)
+
+        except KeyboardInterrupt:
+            print("\nSimulation ended.")
 
 
 # Common Grid Functions
@@ -46,22 +138,6 @@ def next_generation(grid):
                 # Birth: exactly 3 neighbors
                 new_grid[x][y] = 1 if neighbors == 3 else 0
     return new_grid
-
-
-# CLI Text-Only Version
-def run_text_mode(rows, cols, speed, randomize):
-    """Run the simulation in text-only mode."""
-    grid = create_grid(rows, cols, randomize=randomize)
-    try:
-        while True:
-            os.system("cls" if os.name == "nt" else "clear")  # Clear the screen
-            for row in grid:
-                print("".join("#" if cell else "." for cell in row))
-            print("\nPress Ctrl+C to exit.")
-            grid = next_generation(grid)
-            time.sleep(speed)
-    except KeyboardInterrupt:
-        print("\nSimulation ended.")
 
 
 # Pygame GUI Version
@@ -136,15 +212,12 @@ def main():
     parser.add_argument(
         "--speed",
         type=float,
-        default=0.5,
+        default=0.05,
         help="Time (in seconds) between updates (CLI only)",
     )
     parser.add_argument("--gui", action="store_true", help="Force graphical mode (GUI)")
     parser.add_argument(
         "--text", action="store_true", help="Force text-only mode (CLI)"
-    )
-    parser.add_argument(
-        "--randomize", action="store_true", help="Randomly initialize the grid"
     )
     args = parser.parse_args()
 
@@ -152,7 +225,7 @@ def main():
         if not PYGAME_AVAILABLE and args.gui:
             print("Pygame not available. Falling back to text-only mode.")
         print("Running in text-only mode.")
-        run_text_mode(args.rows, args.cols, args.speed, args.randomize)
+        run_text_mode(args.rows, args.cols, args.speed)  # Remove randomize parameter
     else:
         try:
             print("Running in graphical mode.")
@@ -160,7 +233,9 @@ def main():
         except Exception as e:
             print(f"Failed to start graphical mode: {e}")
             print("Falling back to text-only mode.")
-            run_text_mode(args.rows, args.cols, args.speed, args.randomize)
+            run_text_mode(
+                args.rows, args.cols, args.speed
+            )
 
 
 if __name__ == "__main__":
