@@ -104,6 +104,14 @@ The simulator is built around several core functions that handle different aspec
 * `run_gui_mode(rows, cols, cell_size, speed)`: Runs the graphical version of the simulator
 * `main()`: Handles argument parsing, mode selection, and fallback logic
 
+## Development and Contributions
+
+This project was developed collaboratively with Code Duo, an AI-powered coding assistant, and has been refined based on real-world feedback.
+
+For continued development or to request enhancements, visit:
+* [Code Duo](https://chat.openai.com/g/g-RRSEH8DSf-code-duo)
+* Initial commit conversation: [Life Cell Simulator Discussion](https://chatgpt.com/share/6761b2f1-6dc8-8011-9801-0b2ac1527973)
+
 ## Future Enhancements
 
 The following features are planned for future development:
