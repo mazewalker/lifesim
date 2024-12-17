@@ -16,16 +16,6 @@ import time
 import tty
 from typing import List, Optional
 
-# Platform-specific imports
-MSVCRT_AVAILABLE = False
-if sys.platform == "win32":
-    try:
-        import msvcrt
-
-        MSVCRT_AVAILABLE = True
-    except ImportError:
-        pass
-
 # Optional: Try to import Pygame. If unavailable, set a fallback flag.
 try:
     import pygame
@@ -49,6 +39,14 @@ COLORS = {
     "dead": (30, 30, 30),  # Dark gray for dead cells
 }
 
+# Platform-specific imports and configuration
+KEY_HANDLER = None
+if sys.platform == "win32":
+    try:
+        import msvcrt as KEY_HANDLER
+    except ImportError:
+        pass
+
 
 def is_key_pressed() -> Optional[str]:
     """Check if a key was pressed without blocking.
@@ -63,8 +61,8 @@ def is_key_pressed() -> Optional[str]:
         return None
 
     # Windows systems
-    if MSVCRT_AVAILABLE:
-        return msvcrt.getch().decode("utf-8") if msvcrt.kbhit() else None
+    if KEY_HANDLER:
+        return KEY_HANDLER.getch().decode("utf-8") if KEY_HANDLER.kbhit() else None
     return None
 
 
