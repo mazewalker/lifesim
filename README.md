@@ -1,6 +1,6 @@
-[![Pylint](https://github.com/mazewalker/lifesim/actions/workflows/pylint.yml/badge.svg)](https://github.com/mazewalker/lifesim/actions/workflows/pylint.yml)
-
 # Life Cell Simulator
+
+[![Pylint](https://github.com/mazewalker/lifesim/actions/workflows/pylint.yml/badge.svg)](https://github.com/mazewalker/lifesim/actions/workflows/pylint.yml)
 
 The Life Cell Simulator is a Python implementation of Conway's Game of Life, supporting both graphical (Pygame) and text-based (CLI) modes. The program can dynamically switch between modes or fall back to the text-only version if the graphical mode cannot be started.
 
